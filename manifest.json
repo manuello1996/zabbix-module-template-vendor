@@ -1,0 +1,25 @@
+{
+	"manifest_version": 2.0,
+	"id": "template-vendor",
+	"type": "module",
+	"name": "Template Vendor Editor",
+	"namespace": "TemplateVendor",
+	"version": "1.0",
+	"author": "Manuel Pesenti",
+	"description": "Allow editing template vendor and version in the template edit popup.",
+	"actions": {
+		"template.edit": {
+			"class": "TemplateEdit",
+			"view": "template.edit",
+			"layout": "layout.json"
+		},
+		"template.update": {
+			"class": "TemplateUpdate",
+			"layout": "layout.json"
+		},
+		"template.create": {
+			"class": "TemplateCreate",
+			"layout": "layout.json"
+		}
+	}
+}
