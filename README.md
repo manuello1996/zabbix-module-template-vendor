@@ -14,7 +14,9 @@ or define the template vendor and version fields.
 - If you have read-write access to the template, the Vendor and Version fields are editable.
 - If you have read-only access, the fields are disabled.
 - Vendor and Version must be either both filled or both empty.
+- Super admin users see the latest audit log entries for the template in the popup.
 
+![audit log](docs/audit.png)
 ## Notes
 - The module does not add new menu entries or pages.
 - It only overrides `template.edit`, `template.update`, and `template.create` actions to provide

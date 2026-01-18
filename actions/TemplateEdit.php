@@ -17,6 +17,7 @@
 namespace Modules\TemplateVendor\Actions;
 
 use API;
+use CAudit;
 use CArrayHelper;
 use CController;
 use CControllerHostMacrosList;
@@ -375,7 +376,38 @@ class TemplateEdit extends CController {
 		unset($macro);
 
 		$data['warnings'] = $warnings;
+		$data['audit_logs'] = [];
+		$data['show_audit_logs'] = CWebUser::getType() == USER_TYPE_SUPER_ADMIN && $templateid !== null;
+		$data['audit_action_labels'] = [
+			CAudit::ACTION_ADD => _('Add'),
+			CAudit::ACTION_UPDATE => _('Update'),
+			CAudit::ACTION_DELETE => _('Delete'),
+			CAudit::ACTION_EXECUTE => _('Execute'),
+			CAudit::ACTION_HISTORY_CLEAR => _('History clear'),
+			CAudit::ACTION_CONFIG_REFRESH => _('Configuration refresh'),
+			CAudit::ACTION_PUSH => _('Push'),
+			CAudit::ACTION_LOGIN_SUCCESS => _('Login'),
+			CAudit::ACTION_LOGIN_FAILED => _('Failed login'),
+			CAudit::ACTION_LOGOUT => _('Logout')
+		];
 		$data['user'] = ['debug_mode' => $this->getDebugMode()];
+
+		if ($data['show_audit_logs']) {
+			// Load recent template audit entries for super admins only.
+			$data['audit_logs'] = API::AuditLog()->get([
+				'output' => ['auditid', 'action', 'clock', 'username', 'ip', 'details'],
+				'filter' => [
+					'resourcetype' => CAudit::RESOURCE_TEMPLATE,
+					'resourceid' => $templateid,
+					'action' => CAudit::ACTION_UPDATE
+				],
+				'sortfield' => 'auditid',
+				'sortorder' => ZBX_SORT_DOWN,
+				'limit' => 10
+			]);
+
+			$data['audit_logs'] = array_map([$this, 'formatAuditLogDetails'], $data['audit_logs']);
+		}
 
 		$this->setResponse(new CControllerResponseData($data));
 	}
@@ -396,9 +428,89 @@ class TemplateEdit extends CController {
 			'macros' => [],
 			'show_inherited_macros' => 0,
 			'valuemaps' => [],
+			'audit_logs' => [],
+			'show_audit_logs' => false,
+			'audit_action_labels' => [],
 			'readonly' => false,
 			'vendor_readonly' => false,
 			'clone' => false
 		];
+	}
+
+	private function formatAuditLogDetails(array $audit): array {
+		$audit['details_text'] = '';
+		$audit['diff'] = [
+			'added' => [],
+			'removed' => [],
+			'changed' => []
+		];
+		$audit['description_diff'] = null;
+
+		if ($audit['details'] === '') {
+			return $audit;
+		}
+
+		$details = json_decode($audit['details'], true);
+		if (!is_array($details) || !$details) {
+			return $audit;
+		}
+
+		ksort($details);
+
+		foreach ($details as $path => $detail) {
+			if (!is_array($detail) || !array_key_exists(0, $detail)) {
+				continue;
+			}
+
+			switch ($detail[0]) {
+				case CAudit::DETAILS_ACTION_ADD:
+					$audit['diff']['added'][] = array_key_exists(1, $detail)
+						? $path.': '.$detail[1]
+						: $path;
+					break;
+
+				case CAudit::DETAILS_ACTION_DELETE:
+					$audit['diff']['removed'][] = $path;
+					break;
+
+				case CAudit::DETAILS_ACTION_UPDATE:
+					if ($path === 'template.description' && array_key_exists(1, $detail)
+							&& array_key_exists(2, $detail)) {
+						$audit['description_diff'] = [
+							'old' => $detail[2],
+							'new' => $detail[1],
+							'old_preview' => $this->truncateText($detail[2]),
+							'new_preview' => $this->truncateText($detail[1])
+						];
+						break;
+					}
+					$audit['diff']['changed'][] = array_key_exists(1, $detail)
+						? sprintf('%s: %s => %s', $path, $detail[2], $detail[1])
+						: $path;
+					break;
+			}
+		}
+
+		if ($audit['diff']['added']) {
+			$audit['details_text'] .= _('Added').":\n".implode("\n", $audit['diff']['added']);
+		}
+		if ($audit['diff']['removed']) {
+			$audit['details_text'] .= ($audit['details_text'] === '' ? '' : "\n\n").
+				_('Removed').":\n".implode("\n", $audit['diff']['removed']);
+		}
+		if ($audit['diff']['changed']) {
+			$audit['details_text'] .= ($audit['details_text'] === '' ? '' : "\n\n").
+				_('Changed').":\n".implode("\n", $audit['diff']['changed']);
+		}
+
+		return $audit;
+	}
+
+	private function truncateText(string $value, int $limit = 120): string {
+		if (mb_strlen($value) <= $limit) {
+			return $value;
+		}
+
+		return mb_substr($value, 0, $limit - 3).'...';
 	}
 }

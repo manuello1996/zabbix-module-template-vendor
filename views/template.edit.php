@@ -164,6 +164,75 @@ $template_tab->addItem([
 	)
 ]);
 
+if ($data['show_audit_logs']) {
+	$audit_table = (new CTable())
+		->setHeader([_('Time'), _('Action'), _('User'), _('IP'), _('Changes')])
+		->addClass(ZBX_STYLE_TABLE_FORMS)
+		->addStyle('width: '.ZBX_TEXTAREA_STANDARD_WIDTH.'px; font-size: 12px; line-height: 1.3;');
+
+	if ($data['audit_logs']) {
+		foreach ($data['audit_logs'] as $audit) {
+			$changes_items = [];
+
+			if ($audit['description_diff'] !== null) {
+				$summary_text = _('Description').': '.
+					$audit['description_diff']['old_preview'].' => '.$audit['description_diff']['new_preview'];
+
+				$details = (new CTag('details', true))
+					->addItem(new CTag('summary', true, $summary_text))
+					->addItem(
+						(new CDiv([
+							(new CDiv([
+								new CTag('strong', true, _('Old')),
+								(new CDiv($audit['description_diff']['old']))
+									->addStyle('white-space: pre-wrap; margin-top: 2px;')
+							]))->addStyle('margin-bottom: 6px;'),
+							(new CDiv([
+								new CTag('strong', true, _('New')),
+								(new CDiv($audit['description_diff']['new']))
+									->addStyle('white-space: pre-wrap; margin-top: 2px;')
+							]))
+						]))
+							->addStyle('margin-top: 6px;')
+					);
+
+				$changes_items[] = $details;
+			}
+
+			if ($audit['details_text'] !== '') {
+				$changes_items[] = (new CDiv($audit['details_text']))
+					->addStyle('white-space: pre-wrap; margin-top: 6px;');
+			}
+
+			$changes = $changes_items ? new CDiv($changes_items) : '-';
+			$audit_table->addRow([
+				(new CCol(zbx_date2str(DATE_TIME_FORMAT_SECONDS, $audit['clock'])))->addClass(ZBX_STYLE_NOWRAP),
+				(new CCol($data['audit_action_labels'][$audit['action']] ?? $audit['action']))
+					->addClass(ZBX_STYLE_NOWRAP),
+				(new CCol($audit['username']))->addClass(ZBX_STYLE_NOWRAP),
+				(new CCol($audit['ip']))->addClass(ZBX_STYLE_NOWRAP),
+				(new CCol(
+					(new CDiv($changes))
+						->addStyle('white-space: pre-wrap; word-break: break-word; background: #f8f9fb;')
+						->addStyle('border: 1px solid #e1e5ea; border-radius: 4px;')
+						->addStyle('padding: 6px 8px; max-height: 120px; overflow: auto;')
+				))->addStyle('min-width: 320px;')
+			]);
+		}
+	}
+	else {
+		$audit_table->addRow((new CCol(_('No audit log entries found.')))->setColSpan(5));
+	}
+
+	$template_tab->addItem([
+		new CLabel(_('Audit log')),
+		new CFormField(
+			// Show last audit entries for templates to super admin users.
+			$audit_table
+		)
+	]);
+}
+
 // Tags tab.
 $tags_tab = new CPartial('configuration.tags.tab', [
 	'source' => 'template',
