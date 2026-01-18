@@ -3,6 +3,8 @@
 This module overrides the standard template edit popup to let users with read-write permission edit
 or define the template vendor and version fields.
 
+![module](docs/module.png)
+
 ## Installation
 1) Copy this folder into `ui/modules/zabbix-module-template-vendor`.
 2) In Zabbix UI, open `Administration -> General -> Modules` and enable "Template Vendor Editor".
