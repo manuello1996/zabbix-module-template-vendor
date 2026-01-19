@@ -20,6 +20,15 @@
 		"template.create": {
 			"class": "TemplateCreate",
 			"layout": "layout.json"
+		},
+		"template.audit.edit": {
+			"class": "TemplateAuditEdit",
+			"view": "template.audit.edit",
+			"layout": "layout.htmlpage"
+		},
+		"template.audit.update": {
+			"class": "TemplateAuditUpdate",
+			"layout": "layout.json"
 		}
 	}
 }

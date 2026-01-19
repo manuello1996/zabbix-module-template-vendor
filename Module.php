@@ -21,11 +21,26 @@
 
 namespace Modules\TemplateVendor;
 
+use APP;
+use CMenuItem;
 use Zabbix\Core\CModule;
 
 class Module extends CModule {
 
 	public function init(): void {
-		// No UI additions; module only overrides template popup actions.
+		// Register administration menu item for module settings.
+		$administration = APP::Component()->get('menu.main')->find(_('Administration'));
+		if ($administration === null) {
+			return;
+		}
+
+		$general = $administration->getSubMenu()->find(_('General'));
+		if ($general === null || !$general->hasSubMenu()) {
+			return;
+		}
+
+		$general->getSubMenu()->insertAfter(_('Other'),
+			(new CMenuItem(_('Template audit')))->setAction('template.audit.edit')
+		);
 	}
 }

@@ -16,6 +16,7 @@
 
 namespace Modules\TemplateVendor\Actions;
 
+use APP;
 use API;
 use CAudit;
 use CArrayHelper;
@@ -95,6 +96,8 @@ class TemplateEdit extends CController {
 		$templates = [];
 		$warnings = [];
 		$groupids = [];
+		$audit_enabled = $this->getAuditEnabled();
+		$user_type = CWebUser::getType();
 
 		if ($clone) {
 			$data = [
@@ -377,7 +380,9 @@ class TemplateEdit extends CController {
 
 		$data['warnings'] = $warnings;
 		$data['audit_logs'] = [];
-		$data['show_audit_logs'] = CWebUser::getType() == USER_TYPE_SUPER_ADMIN && $templateid !== null;
+		$data['show_audit_logs'] = $audit_enabled
+			&& $templateid !== null
+			&& in_array($user_type, [USER_TYPE_SUPER_ADMIN, USER_TYPE_ZABBIX_ADMIN], true);
 		$data['audit_action_labels'] = [
 			CAudit::ACTION_ADD => _('Add'),
 			CAudit::ACTION_UPDATE => _('Update'),
@@ -394,17 +399,22 @@ class TemplateEdit extends CController {
 
 		if ($data['show_audit_logs']) {
 			// Load recent template audit entries for super admins only.
-			$data['audit_logs'] = API::AuditLog()->get([
-				'output' => ['auditid', 'action', 'clock', 'username', 'ip', 'details'],
-				'filter' => [
-					'resourcetype' => CAudit::RESOURCE_TEMPLATE,
-					'resourceid' => $templateid,
-					'action' => CAudit::ACTION_UPDATE
-				],
-				'sortfield' => 'auditid',
-				'sortorder' => ZBX_SORT_DOWN,
-				'limit' => 10
-			]);
+			if ($user_type == USER_TYPE_SUPER_ADMIN) {
+				$data['audit_logs'] = API::AuditLog()->get([
+					'output' => ['auditid', 'action', 'clock', 'username', 'ip', 'details'],
+					'filter' => [
+						'resourcetype' => CAudit::RESOURCE_TEMPLATE,
+						'resourceid' => $templateid,
+						'action' => CAudit::ACTION_UPDATE
+					],
+					'sortfield' => 'auditid',
+					'sortorder' => ZBX_SORT_DOWN,
+					'limit' => 10
+				]);
+			}
+			else {
+				$data['audit_logs'] = $this->getAuditLogsFromDb((int) $templateid);
+			}
 
 			$data['audit_logs'] = array_map([$this, 'formatAuditLogDetails'], $data['audit_logs']);
 		}
@@ -435,6 +445,34 @@ class TemplateEdit extends CController {
 			'vendor_readonly' => false,
 			'clone' => false
 		];
+	}
+
+	private function getAuditEnabled(): bool {
+		$module = APP::ModuleManager()->getModule('template-vendor');
+
+		if ($module === null) {
+			return true;
+		}
+
+		return (bool) $module->getOption('audit_enabled', 1);
+	}
+
+	private function getAuditLogsFromDb(int $templateid): array {
+		$sql = 'SELECT auditid, action, clock, username, ip, details'.
+			' FROM auditlog'.
+			' WHERE resourcetype='.CAudit::RESOURCE_TEMPLATE.
+				' AND resourceid='.zbx_dbstr($templateid).
+				' AND action='.CAudit::ACTION_UPDATE.
+			' ORDER BY auditid DESC';
+
+		$logs = [];
+		$result = DBselect($sql, 10);
+
+		while ($row = DBfetch($result)) {
+			$logs[] = $row;
+		}
+
+		return $logs;
 	}
 
 	private function formatAuditLogDetails(array $audit): array {

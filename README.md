@@ -15,6 +15,7 @@ or define the template vendor and version fields.
 - If you have read-only access, the fields are disabled.
 - Vendor and Version must be either both filled or both empty.
 - Super admin users see the latest audit log entries for the template in the popup.
+- The audit log section can be enabled or disabled globally in `Administration -> Template audit`.
 
 ![audit log](docs/audit.png)
 ## Notes
